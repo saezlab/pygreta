@@ -11,9 +11,6 @@ from pygreta.tl._utils import _prc_rcl_f01
 # TODO: add support for when users only have RNA
 
 
-# BUG: need to use weight for metric gsets, right now is set to None and that is misleading for progeny.
-
-
 def _grn_to_pr(
     grn: pd.DataFrame,
     column: str | None = None,

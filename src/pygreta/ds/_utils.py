@@ -2,10 +2,9 @@ import os
 import shutil
 
 import decoupler as dc
-import pandas as pd
 from decoupler._download import _download, _log
 
-from pygreta.config import DATA, METRIC_CATS, PATH_DATA, URL_END, URL_STR
+from pygreta.config import DATA, PATH_DATA, URL_END, URL_STR
 
 
 def show_organisms() -> None:
@@ -25,48 +24,6 @@ def show_organisms() -> None:
         pg.show_organisms(organism="hg38")
     """
     return list(DATA.keys())
-
-
-def show_metrics(organism: str | None = None) -> None:
-    """
-    Show all available metrics.
-
-    Parameters
-    ----------
-    organism
-        Which organism to use.
-
-    Returns
-    -------
-    Dataframe listing all available metrics per organism.
-
-    Example
-    -------
-    .. code-block:: python
-
-        import pygreta as pg
-
-        pg.show_metrics(organism="hg38")
-    """
-    assert isinstance(organism, str) or organism is None
-    df = []
-    for org in DATA:
-        org_dbs = DATA[org]
-        for db in org_dbs:
-            metric = org_dbs[db]["metric"]
-            metric_cat = METRIC_CATS[metric]
-            df.append([org, metric_cat, metric, db])
-    cols = ["organism", "category", "metric", "db"]
-    df = pd.DataFrame(df, columns=cols)
-    df = df.sort_values(cols)
-    if organism:
-        organisms = show_organisms()
-        assert organism in organisms, f"organism={organism} not available ({organisms})"
-        df = df[df["organism"] == organism].drop(columns="organism")
-    else:
-        df = df.sort_values(cols)
-    df = df.reset_index(drop=True)
-    return df
 
 
 def _download_data(

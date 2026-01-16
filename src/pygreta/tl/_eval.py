@@ -103,7 +103,9 @@ def benchmark(
             _log(f"Evaluating GRN '{grn_name}' on dataset '{dataset_name}'...", level="info", verbose=True)
             # Get terms for this dataset
             dataset_terms = None
-            if terms is not None and dataset_name in terms:
+            if terms is None:
+                dataset_terms = _check_terms(organism=organism, dataset=dataset_name, terms=terms)
+            else:
                 dataset_terms = terms[dataset_name]
             # Run evaluation
             result = eval_grn_dataset(

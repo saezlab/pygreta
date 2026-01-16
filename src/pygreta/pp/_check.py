@@ -2,9 +2,9 @@ import anndata as ad
 import mudata as mu
 import pandas as pd
 
+from pygreta._utils import show_datasets, show_metrics, show_terms
 from pygreta.config import DATA
-from pygreta.ds._utils import show_datasets, show_terms
-from pygreta.tl._utils import show_metrics
+from pygreta.ds._dts import _read_dts
 
 
 def _check_organism(organism: str) -> None:
@@ -173,11 +173,7 @@ def _check_dataset(
         assert dataset in DATA[organism]["dts"], (
             f'Dataset "{dataset}" not found in config. Run pygreta.ds.show_datasets() to see available datasets'
         )
-        # TODO: download and return dataset
-        # dataset = _download_dataset(name=dataset)
-        raise NotImplementedError(
-            "Downloading datasets by name is not yet implemented. Please load the dataset manually."
-        )
+        dataset = _read_dts(organism=organism, dts_name=dataset)
     elif isinstance(dataset, mu.MuData):
         assert {"rna", "atac"}.issubset(dataset.mod), 'Modalities "rna" and "atac" missing in dataset.mod'
         assert "celltype" in dataset.obs.columns, 'Column "celltype" not found in dataset.obs'
@@ -255,7 +251,11 @@ def _check_terms(
         assert db in DATA[organism]["dbs"], (
             f'db="{db}" not found in databases. View available options: pygreta.tl.show_metrics()'
         )
-        og_db_terms = set(terms_df[terms_df["db_name"] == db]["term"])
+        if db.startswith("KnockTF"):
+            db_t = "KnockTF"
+        else:
+            db_t = db
+        og_db_terms = set(terms_df[terms_df["db_name"] == db_t]["term"])
         db_terms = set(terms[db])
         diff_terms = list(db_terms - og_db_terms)
         n_diff = len(diff_terms)

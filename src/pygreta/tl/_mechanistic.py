@@ -6,11 +6,22 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.stats as sts
-from pyboolnet import file_exchange, trap_spaces
 from sklearn.linear_model import Ridge
 from tqdm import tqdm
 
 from pygreta.tl._utils import _f_beta_score
+
+
+def _get_pyboolnet():
+    try:
+        from pyboolnet import file_exchange, trap_spaces
+
+        return file_exchange, trap_spaces
+    except ImportError as e:
+        raise ImportError(
+            "pyboolnet is required for Boolean simulation but is not installed. "
+            "Install it with: pip install git+https://github.com/hklarner/pyboolnet.git"
+        ) from e
 
 
 def _get_source_markers(
@@ -76,7 +87,7 @@ def _fisher_test(
     c = sm_set - hits
     d = sources - a - b - c
     a, b, c, d = len(a), len(b), len(c), len(d)
-    p = dc.mt._ora._test1t(a=a, b=b, c=c, d=d)
+    _, p = sts.fisher_exact([[a, b], [c, d]], alternative="greater")
     return p
 
 
@@ -143,6 +154,7 @@ def _sim(
     sgrn = grn[(grn["source"].isin(f_sources)) & (grn["target"].isin(f_sources))]
     # Simulate
     if sgrn.shape[0] >= 5:  # Remove outlier networks
+        file_exchange, trap_spaces = _get_pyboolnet()
         bool_rules = _define_bool_rules(grn=sgrn, indegree=indegree)
         primes = file_exchange.bnet2primes(bool_rules)
         logging.getLogger("pyboolnet.external.potassco").disabled = True  # Disable warnings

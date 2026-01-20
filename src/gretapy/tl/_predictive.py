@@ -7,7 +7,7 @@ import scipy.stats as sts
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 
-from pygreta.tl._utils import _f_beta_score, _prc_rcl_f01
+from gretapy.tl._utils import _f_beta_score, _prc_rcl_f01
 
 
 def _remove_zeros(

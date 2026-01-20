@@ -1,16 +1,16 @@
 # API
 
-Import pygreta as:
+Import gretapy as:
 
 ```
-import pygreta as pg
+import gretapy as gt
 ```
 
 ## General Functions
 
 ```{eval-rst}
-.. module:: pygreta
-.. currentmodule:: pygreta
+.. module:: gretapy
+.. currentmodule:: gretapy
 
 .. autosummary::
     :toctree: generated

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 
-from pygreta.tl._utils import _prc_rcl_f01
+from gretapy.tl._utils import _prc_rcl_f01
 
 # TODO: cats = [re.escape(c) for c in cats]!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Else results are different
 # TODO: assert that genes and cres in grn are in mdata input

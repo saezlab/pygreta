@@ -1,4 +1,4 @@
-"""Shared utility functions for pygreta."""
+"""Shared utility functions for gretapy."""
 
 import os
 import shutil
@@ -6,7 +6,7 @@ import shutil
 import pandas as pd
 from decoupler._download import _download
 
-from pygreta.config import DATA, METRIC_CATS, PATH_DATA, URL_END, URL_STR
+from gretapy.config import DATA, METRIC_CATS, PATH_DATA, URL_END, URL_STR
 
 
 def show_organisms() -> list:
@@ -21,9 +21,9 @@ def show_organisms() -> list:
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
 
-        pg.show_organisms()
+        gt.show_organisms()
     """
     return list(DATA.keys())
 
@@ -45,9 +45,9 @@ def show_datasets(organism: str) -> pd.DataFrame:
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
 
-        pg.show_datasets(organism="hg38")
+        gt.show_datasets(organism="hg38")
     """
     organisms = show_organisms()
     assert organism in organisms, f"organism={organism} not available ({organisms})"
@@ -81,9 +81,9 @@ def show_terms(organism: str) -> pd.DataFrame:
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
 
-        pg.show_terms(organism="hg38")
+        gt.show_terms(organism="hg38")
     """
     organisms = show_organisms()
     assert organism in organisms, f"organism={organism} not available ({organisms})"
@@ -116,9 +116,9 @@ def show_metrics(organism: str | None = None) -> pd.DataFrame:
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
 
-        pg.show_metrics(organism="hg38")
+        gt.show_metrics(organism="hg38")
     """
     assert isinstance(organism, str) or organism is None
     df = []

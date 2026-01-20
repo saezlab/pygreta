@@ -7,7 +7,7 @@ import pandas as pd
 import pyranges as pr
 from decoupler._download import _download, _log
 
-from pygreta.config import DATA, PATH_DATA, URL_END, URL_STR
+from gretapy.config import DATA, PATH_DATA, URL_END, URL_STR
 
 
 def _download_db(

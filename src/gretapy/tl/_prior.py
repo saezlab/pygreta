@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as sts
 
-from pygreta.tl._utils import _prc_rcl_f01
+from gretapy.tl._utils import _prc_rcl_f01
 
 
 def _grn(

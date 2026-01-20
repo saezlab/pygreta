@@ -1,9 +1,9 @@
-"""Tests for pygreta.tl._eval module."""
+"""Tests for gretapy.tl._eval module."""
 
 import pandas as pd
 import pytest
 
-from pygreta.tl._eval import (
+from gretapy.tl._eval import (
     _run_fileless_metric,
     _run_metric,
     _run_omics_metric,

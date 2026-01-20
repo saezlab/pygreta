@@ -3,8 +3,8 @@
 Functions for downloading and reading datasets and databases.
 
 ```{eval-rst}
-.. module:: pygreta.ds
-.. currentmodule:: pygreta.ds
+.. module:: gretapy.ds
+.. currentmodule:: gretapy.ds
 
 .. autosummary::
     :toctree: generated

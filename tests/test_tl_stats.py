@@ -1,10 +1,10 @@
-"""Tests for pygreta.tl._stats module."""
+"""Tests for gretapy.tl._stats module."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from pygreta.tl._stats import _get_grn_stats, _ocoeff, ocoeff, stats
+from gretapy.tl._stats import _get_grn_stats, _ocoeff, ocoeff, stats
 
 # ============================================================================
 # Fixtures specific to stats module tests

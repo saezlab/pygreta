@@ -1,8 +1,8 @@
-"""Tests for pygreta.tl._utils module."""
+"""Tests for gretapy.tl._utils module."""
 
 import pytest
 
-from pygreta.tl._utils import _f_beta_score, _prc_rcl_f01
+from gretapy.tl._utils import _f_beta_score, _prc_rcl_f01
 
 
 class TestFBetaScore:

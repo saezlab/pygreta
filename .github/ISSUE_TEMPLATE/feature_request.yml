@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new feature for pygreta
+description: Propose a new feature for gretapy
 type: Enhancement
 body:
   - type: textarea

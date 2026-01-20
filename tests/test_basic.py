@@ -1,5 +1,5 @@
-import pygreta
+import gretapy
 
 
 def test_package_has_version():
-    assert pygreta.__version__ is not None
+    assert gretapy.__version__ is not None

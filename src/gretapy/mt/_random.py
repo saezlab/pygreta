@@ -4,8 +4,8 @@ import pandas as pd
 import pyranges as pr
 from decoupler._download import _log
 
-from pygreta.ds._db import read_db
-from pygreta.pp._check import _check_organism
+from gretapy.ds._db import read_db
+from gretapy.pp._check import _check_organism
 
 
 def _get_cres_pr(peaks: np.ndarray) -> pr.PyRanges:

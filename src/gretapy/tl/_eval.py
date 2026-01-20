@@ -4,9 +4,9 @@ import pandas as pd
 import pyranges as pr
 from decoupler._log import _log
 
-from pygreta.config import DATA, METRIC_CATS
-from pygreta.ds._db import read_db
-from pygreta.pp._check import (
+from gretapy.config import DATA, METRIC_CATS
+from gretapy.ds._db import read_db
+from gretapy.pp._check import (
     _check_dataset,
     _check_datasets,
     _check_dts_grn,
@@ -15,10 +15,10 @@ from pygreta.pp._check import (
     _check_organism,
     _check_terms,
 )
-from pygreta.tl._genomic import _cre, _cre_column
-from pygreta.tl._mechanistic import _frc, _sim, _tfa
-from pygreta.tl._predictive import _gset, _omics
-from pygreta.tl._prior import _grn, _tfm, _tfp
+from gretapy.tl._genomic import _cre, _cre_column
+from gretapy.tl._mechanistic import _frc, _sim, _tfa
+from gretapy.tl._predictive import _gset, _omics
+from gretapy.tl._prior import _grn, _tfm, _tfp
 
 
 def benchmark(
@@ -61,12 +61,12 @@ def benchmark(
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
         import pandas as pd
 
         # Single GRN
         grn = pd.read_csv("grn.csv")
-        results = pg.tl.benchmark(
+        results = gt.tl.benchmark(
             organism="hg38",
             grns=grn,
             datasets=["pbmc10k", "brain"],
@@ -77,7 +77,7 @@ def benchmark(
             "method_a": pd.read_csv("grn_a.csv"),
             "method_b": pd.read_csv("grn_b.csv"),
         }
-        results = pg.tl.benchmark(
+        results = gt.tl.benchmark(
             organism="hg38",
             grns=grns,
             datasets=None,  # all datasets
@@ -164,11 +164,11 @@ def eval_grn_dataset(
     -------
     .. code-block:: python
 
-        import pygreta as pg
+        import gretapy as gt
         import pandas as pd
 
         grn = pd.read_csv("grn.csv")
-        results = pg.tl.eval_grn_dataset(
+        results = gt.tl.eval_grn_dataset(
             organism="hg38",
             grn=grn,
             dataset="pbmc10k",

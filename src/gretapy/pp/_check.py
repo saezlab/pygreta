@@ -2,9 +2,9 @@ import anndata as ad
 import mudata as mu
 import pandas as pd
 
-from pygreta._utils import show_datasets, show_metrics, show_terms
-from pygreta.config import DATA
-from pygreta.ds._dts import read_dts
+from gretapy._utils import show_datasets, show_metrics, show_terms
+from gretapy.config import DATA
+from gretapy.ds._dts import read_dts
 
 
 def _check_organism(organism: str) -> None:
@@ -107,7 +107,7 @@ def _check_metrics(
                 tmp_metrics.extend(df_metrics[df_metrics["db"] == metric]["db"].to_list())
             else:
                 raise ValueError(
-                    f"Invalid metric or database: '{metric}'. View available options: pygreta.tl.show_metrics()"
+                    f"Invalid metric or database: '{metric}'. View available options: gretapy.tl.show_metrics()"
                 )
         metrics = list(set(tmp_metrics))
     else:
@@ -171,7 +171,7 @@ def _check_dataset(
     """
     if isinstance(dataset, str):
         assert dataset in DATA[organism]["dts"], (
-            f'Dataset "{dataset}" not found in config. Run pygreta.ds.show_datasets() to see available datasets'
+            f'Dataset "{dataset}" not found in config. Run gretapy.ds.show_datasets() to see available datasets'
         )
         dataset = read_dts(organism=organism, dts_name=dataset)
     elif isinstance(dataset, mu.MuData):
@@ -249,7 +249,7 @@ def _check_terms(
     terms_df = show_terms(organism=organism)
     for db in terms:
         assert db in DATA[organism]["dbs"], (
-            f'db="{db}" not found in databases. View available options: pygreta.tl.show_metrics()'
+            f'db="{db}" not found in databases. View available options: gretapy.tl.show_metrics()'
         )
         if db.startswith("KnockTF"):
             db_t = "KnockTF"
@@ -260,6 +260,6 @@ def _check_terms(
         diff_terms = list(db_terms - og_db_terms)
         n_diff = len(diff_terms)
         assert n_diff == 0, (
-            f"{n_diff} terms do not exist in db={db}: {diff_terms[:5]} View available options: pygreta.ds.show_terms()"
+            f"{n_diff} terms do not exist in db={db}: {diff_terms[:5]} View available options: gretapy.ds.show_terms()"
         )
     return terms

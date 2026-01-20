@@ -1,9 +1,9 @@
-"""Tests for pygreta.tl._prior module."""
+"""Tests for gretapy.tl._prior module."""
 
 import pandas as pd
 import pytest
 
-from pygreta.tl._prior import _compute_overlap_pval, _find_pairs, _grn, _tfm, _tfp
+from gretapy.tl._prior import _compute_overlap_pval, _find_pairs, _grn, _tfm, _tfp
 
 
 class TestGrn:

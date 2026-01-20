@@ -1,4 +1,4 @@
-"""Tests for pygreta.pp._check module."""
+"""Tests for gretapy.pp._check module."""
 
 import anndata as ad
 import mudata as mu
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pygreta.pp._check import (
+from gretapy.pp._check import (
     _check_dataset,
     _check_datasets,
     _check_dts_grn,

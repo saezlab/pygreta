@@ -3,8 +3,8 @@
 Plotting functions for visualizing GRN analysis results.
 
 ```{eval-rst}
-.. module:: pygreta.pl
-.. currentmodule:: pygreta.pl
+.. module:: gretapy.pl
+.. currentmodule:: gretapy.pl
 
 .. autosummary::
     :toctree: generated

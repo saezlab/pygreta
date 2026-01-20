@@ -1,4 +1,4 @@
-"""Tests for pygreta.mt module (GRN inference methods)."""
+"""Tests for gretapy.mt module (GRN inference methods)."""
 
 from unittest.mock import patch
 
@@ -9,9 +9,9 @@ import pandas as pd
 import pyranges as pr
 import pytest
 
-from pygreta.mt._collectri import collectri
-from pygreta.mt._correlation import correlation
-from pygreta.mt._random import _get_cres_pr, _get_overlap_cres, _get_window, random
+from gretapy.mt._collectri import collectri
+from gretapy.mt._correlation import correlation
+from gretapy.mt._random import _get_cres_pr, _get_overlap_cres, _get_window, random
 
 # ============================================================================
 # Fixtures specific to mt module tests
@@ -274,7 +274,7 @@ class TestCollectri:
         with pytest.raises(ValueError, match="Invalid organism"):
             collectri(mdata=mudata_for_mt, organism="invalid")
 
-    @patch("pygreta.mt._collectri.read_db")
+    @patch("gretapy.mt._collectri.read_db")
     def test_returns_dataframe(self, mock_read_db, mudata_for_mt, mock_collectri_grn, mock_promoters_db):
         """Test that function returns a DataFrame."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -285,7 +285,7 @@ class TestCollectri:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("pygreta.mt._collectri.read_db")
+    @patch("gretapy.mt._collectri.read_db")
     def test_output_columns(self, mock_read_db, mudata_for_mt, mock_collectri_grn, mock_promoters_db):
         """Test that output has correct columns."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -299,7 +299,7 @@ class TestCollectri:
         assert "target" in result.columns
         assert "score" in result.columns
 
-    @patch("pygreta.mt._collectri.read_db")
+    @patch("gretapy.mt._collectri.read_db")
     def test_min_targets_filtering(self, mock_read_db, mudata_for_mt, mock_collectri_grn, mock_promoters_db):
         """Test that min_targets parameter filters TFs."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -312,7 +312,7 @@ class TestCollectri:
         # Higher min_targets should result in fewer or equal TFs
         assert len(result_high) <= len(result_low)
 
-    @patch("pygreta.mt._collectri.read_db")
+    @patch("gretapy.mt._collectri.read_db")
     def test_filters_by_available_genes(self, mock_read_db, mock_collectri_grn, mock_promoters_db):
         """Test that GRN is filtered by genes available in MuData."""
         # Create MuData with only some genes
@@ -366,7 +366,7 @@ class TestCorrelation:
         with pytest.raises(ValueError, match='must be "pearson" or "spearman"'):
             correlation(mdata=mudata_for_mt, tfs=["PAX5"], method="invalid")
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_returns_dataframe(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test that function returns a DataFrame."""
         mock_read_db.return_value = mock_promoters_db
@@ -381,7 +381,7 @@ class TestCorrelation:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_output_columns(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test that output has correct columns."""
         mock_read_db.return_value = mock_promoters_db
@@ -400,7 +400,7 @@ class TestCorrelation:
             assert "target" in result.columns
             assert "score" in result.columns
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_pearson_method(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test pearson correlation method."""
         mock_read_db.return_value = mock_promoters_db
@@ -416,7 +416,7 @@ class TestCorrelation:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_spearman_method(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test spearman correlation method."""
         mock_read_db.return_value = mock_promoters_db
@@ -432,7 +432,7 @@ class TestCorrelation:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_thr_r_filtering(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test that thr_r parameter filters by correlation threshold."""
         mock_read_db.return_value = mock_promoters_db
@@ -456,7 +456,7 @@ class TestCorrelation:
         # Higher threshold should result in fewer edges
         assert len(result_high) <= len(result_low)
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_filters_self_regulation(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test that self-regulation edges are removed."""
         mock_read_db.return_value = mock_promoters_db
@@ -473,7 +473,7 @@ class TestCorrelation:
         if len(result) > 0:
             assert not any(result["source"] == result["target"])
 
-    @patch("pygreta.mt._correlation.read_db")
+    @patch("gretapy.mt._correlation.read_db")
     def test_filters_tfs_not_in_dataset(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test that TFs not in dataset are filtered out."""
         mock_read_db.return_value = mock_promoters_db
@@ -517,7 +517,7 @@ class TestRandom:
         with pytest.raises(ValueError, match="Invalid organism"):
             random(mdata=mudata_for_mt, organism="invalid")
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_returns_dataframe(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that function returns a DataFrame."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -528,7 +528,7 @@ class TestRandom:
 
         assert isinstance(result, pd.DataFrame)
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_output_columns(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that output has correct columns."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -543,7 +543,7 @@ class TestRandom:
             assert "target" in result.columns
             assert "score" in result.columns
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_reproducibility_with_seed(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that same seed produces same results."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -555,7 +555,7 @@ class TestRandom:
 
         pd.testing.assert_frame_equal(result1, result2)
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_different_seeds_different_results(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that different seeds produce different results."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -569,7 +569,7 @@ class TestRandom:
             # Results should generally differ (not guaranteed but highly likely)
             assert not result1.equals(result2) or len(result1) == 0
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_custom_tfs_list(self, mock_read_db, mudata_for_mt, mock_promoters_db):
         """Test using custom TFs list instead of LambertTFs."""
         mock_read_db.return_value = mock_promoters_db
@@ -587,7 +587,7 @@ class TestRandom:
         if len(result) > 0:
             assert set(result["source"]).issubset({"PAX5", "GATA3"})
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_g_perc_parameter(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that g_perc controls percentage of genes sampled."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -602,7 +602,7 @@ class TestRandom:
         assert isinstance(result_low, pd.DataFrame)
         assert isinstance(result_high, pd.DataFrame)
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_min_targets_filtering(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that min_targets parameter filters TFs."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -615,7 +615,7 @@ class TestRandom:
         # Higher min_targets should result in fewer or equal edges
         assert len(result_high) <= len(result_low)
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_score_is_one(self, mock_read_db, mudata_for_mt, mock_lambert_tfs, mock_promoters_db):
         """Test that all scores are 1.0 for random GRN."""
         mock_read_db.side_effect = lambda organism, db_name, verbose: (
@@ -627,7 +627,7 @@ class TestRandom:
         if len(result) > 0:
             assert all(result["score"] == 1.0)
 
-    @patch("pygreta.mt._random.read_db")
+    @patch("gretapy.mt._random.read_db")
     def test_empty_result_when_no_overlaps(self, mock_read_db):
         """Test that empty DataFrame is returned when no peak-gene overlaps."""
         # Create MuData with peaks on different chromosomes than promoters

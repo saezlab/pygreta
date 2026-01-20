@@ -3,7 +3,7 @@ build-backend = "hatchling.build"
 requires = [ "hatchling" ]
 
 [project]
-name = "pygreta"
+name = "gretapy"
 version = "0.0.1"
 description = "Package to evaluate gene regulatory networks (GRNs)."
 readme = "README.md"
@@ -31,9 +31,9 @@ dependencies = [
   "session-info2",
 ]
 # https://docs.pypi.org/project_metadata/#project-urls
-urls.Documentation = "https://pygreta.readthedocs.io/"
-urls.Homepage = "https://github.com/PauBadiaM/pygreta"
-urls.Source = "https://github.com/PauBadiaM/pygreta"
+urls.Documentation = "https://gretapy.readthedocs.io/"
+urls.Homepage = "https://github.com/PauBadiaM/gretapy"
+urls.Source = "https://github.com/PauBadiaM/gretapy"
 
 [dependency-groups]
 dev = [
@@ -138,7 +138,7 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = [ "pygreta" ]
+source = [ "gretapy" ]
 patch = [ "subprocess" ]
 omit = [
   "**/test_*.py",

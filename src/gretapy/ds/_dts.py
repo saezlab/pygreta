@@ -4,7 +4,7 @@ import shutil
 import mudata as mu
 from decoupler._download import _download, _log
 
-from pygreta.config import DATA, PATH_DATA, URL_END, URL_STR
+from gretapy.config import DATA, PATH_DATA, URL_END, URL_STR
 
 
 def _download_dts(

@@ -1,4 +1,4 @@
-"""Tests for pygreta.pl module (plotting functions)."""
+"""Tests for gretapy.pl module (plotting functions)."""
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ import pytest
 # Use non-interactive backend for testing
 matplotlib.use("Agg")
 
-from pygreta.pl._heatmap import _make_sim_mat, heatmap
+from gretapy.pl._heatmap import _make_sim_mat, heatmap
 
 # ============================================================================
 # Fixtures specific to pl module tests

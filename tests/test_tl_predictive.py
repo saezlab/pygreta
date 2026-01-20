@@ -1,9 +1,9 @@
-"""Tests for pygreta.tl._predictive module."""
+"""Tests for gretapy.tl._predictive module."""
 
 import numpy as np
 import pandas as pd
 
-from pygreta.tl._predictive import _extract_data, _gset, _omics, _remove_zeros, _test_predictability
+from gretapy.tl._predictive import _extract_data, _gset, _omics, _remove_zeros, _test_predictability
 
 
 class TestRemoveZeros:

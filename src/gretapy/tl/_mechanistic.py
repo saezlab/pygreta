@@ -9,7 +9,7 @@ import scipy.stats as sts
 from sklearn.linear_model import Ridge
 from tqdm import tqdm
 
-from pygreta.tl._utils import _f_beta_score
+from gretapy.tl._utils import _f_beta_score
 
 
 def _get_pyboolnet():

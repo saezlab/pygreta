@@ -1,10 +1,10 @@
-"""Tests for pygreta.tl._mechanistic module."""
+"""Tests for gretapy.tl._mechanistic module."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from pygreta.tl._mechanistic import (
+from gretapy.tl._mechanistic import (
     _coefmat,
     _define_bool_rules,
     _fisher_test,

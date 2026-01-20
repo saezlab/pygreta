@@ -1,38 +1,31 @@
 import mudata as mu
-import numpy as np
 import pandas as pd
 import pyranges as pr
-import scipy.stats as sts
 from decoupler._download import _log
 
-from pygreta.ds._db import read_db
-from pygreta.pp._check import _check_organism
+from gretapy.ds._db import read_db
+from gretapy.pp._check import _check_organism
 
 
-def correlation(
+def collectri(
     mdata: mu.MuData,
-    tfs: np.ndarray | list,
     organism: str = "hg38",
-    method: str = "pearson",
-    thr_r: float = 0.3,
     min_targets: int = 5,
     verbose: bool = False,
 ) -> pd.DataFrame:
     """
-    Infer a GRN based on TF-gene expression correlation.
+    Generate a GRN from CollecTRI prior knowledge filtered by available peaks and genes.
+
+    This method downloads the CollecTRI reference GRN and promoter annotations,
+    then prunes the network based on the peaks and genes available in the input
+    MuData object.
 
     Parameters
     ----------
     mdata
         MuData object with "rna" and "atac" modalities.
-    tfs
-        Array or list of transcription factor names.
     organism
         Which organism to use. Default is "hg38".
-    method
-        Correlation method: "pearson" or "spearman". Default is "pearson".
-    thr_r
-        Minimum absolute correlation threshold. Default is 0.3.
     min_targets
         Minimum number of targets required for a TF to be included. Default is 5.
     verbose
@@ -42,39 +35,35 @@ def correlation(
     -------
     pd.DataFrame
         GRN DataFrame with columns: source, cre, target, score.
+        - source: Transcription factor name.
+        - cre: Cis-regulatory element (peak) in format chrX-start-end.
+        - target: Target gene name.
+        - score: Edge weight from CollecTRI.
+
+    Examples
+    --------
+    >>> import mudata as mu
+    >>> import gretapy as gt
+    >>> mdata = mu.read("my_multiome.h5mu")
+    >>> grn = gt.mt.collectri(mdata, organism="hg38")
+    >>> grn.head()
     """
+    # Validate inputs
     _check_organism(organism)
     if not isinstance(mdata, mu.MuData):
         raise ValueError(f"mdata must be a MuData object, got {type(mdata)}")
     if not {"rna", "atac"}.issubset(mdata.mod):
         raise ValueError('MuData must contain "rna" and "atac" modalities')
-    if method not in {"pearson", "spearman"}:
-        raise ValueError(f'method must be "pearson" or "spearman", got {method}')
 
+    # Extract genes and peaks from mdata
     genes = mdata.mod["rna"].var_names.astype("U")
     peaks = mdata.mod["atac"].var_names.astype("U")
 
-    # Filter TFs to those present in the dataset
-    tfs = np.array(list(set(genes) & set(tfs)))
-    _log(f"Found {len(tfs)} TFs in dataset", level="info", verbose=verbose)
+    _log("Downloading CollecTRI GRN...", level="info", verbose=verbose)
+    grn = read_db(organism=organism, db_name="CollecTRI", verbose=verbose)
 
-    # Compute correlation
-    _log(f"Computing {method} correlation...", level="info", verbose=verbose)
-    x = mdata.mod["rna"][:, tfs].X
-    y = mdata.mod["rna"].X
-
-    if method == "spearman":
-        x = sts.rankdata(x, axis=0)
-        y = sts.rankdata(y, axis=0)
-
-    corr = np.corrcoef(x=x, y=y, rowvar=False)
-    grn = pd.DataFrame(corr[: tfs.size, tfs.size :], index=tfs, columns=genes)
-    grn = grn.reset_index(names="source").melt(id_vars="source", var_name="target", value_name="score")
-
-    # Filter by threshold and remove self-regulation
-    grn = grn[grn["score"].abs() > thr_r]
-    grn = grn[grn["source"] != grn["target"]]
-    _log(f"GRN edges after correlation filtering: {len(grn)}", level="info", verbose=verbose)
+    _log("Downloading promoter annotations...", level="info", verbose=verbose)
+    proms = read_db(organism=organism, db_name="Promoters", verbose=verbose)
 
     # Transform peaks to PyRanges
     peaks_df = pd.DataFrame(peaks, columns=["cre"])
@@ -83,9 +72,11 @@ def correlation(
     peaks_df["End"] = peaks_df["End"].astype(int)
     peaks_pr = pr.PyRanges(peaks_df[["Chromosome", "Start", "End"]])
 
-    # Load promoters and filter by genes
-    _log("Downloading promoter annotations...", level="info", verbose=verbose)
-    proms = read_db(organism=organism, db_name="Promoters", verbose=verbose)
+    # Filter GRN by available genes
+    grn = grn[grn["source"].astype("U").isin(genes) & grn["target"].astype("U").isin(genes)]
+    _log(f"GRN edges after gene filtering: {len(grn)}", level="info", verbose=verbose)
+
+    # Filter promoters by available genes
     proms = proms[proms.Name.astype("U").isin(genes)]
 
     # Find promoters that overlap with peaks
@@ -93,14 +84,15 @@ def correlation(
     proms_df = proms_nearest.df
     proms_df = proms_df[proms_df["Distance"] == 0]
 
+    # Create CRE column from overlapping peak coordinates
     proms_df["cre"] = (
         proms_df["Chromosome"].astype(str) + "-" + proms_df["Start_b"].astype(str) + "-" + proms_df["End_b"].astype(str)
     )
     proms_df = proms_df[["cre", "Name"]].rename(columns={"Name": "target"}).drop_duplicates()
 
     # Merge GRN with promoter-peak mappings
-    grn = pd.merge(grn, proms_df, how="inner")[["source", "cre", "target", "score"]]
-    grn = grn.sort_values(["source", "target", "cre"])
+    grn = pd.merge(grn, proms_df, how="inner")[["source", "cre", "target", "weight"]]
+    grn = grn.sort_values(["source", "target", "cre"]).rename(columns={"weight": "score"})
     _log(f"GRN edges after peak filtering: {len(grn)}", level="info", verbose=verbose)
 
     # Filter TFs with less than min_targets targets

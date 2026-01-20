@@ -1,4 +1,4 @@
-from pygreta.pp._check import (
+from gretapy.pp._check import (
     _check_dataset,
     _check_dts_grn,
     _check_grn,

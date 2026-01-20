@@ -5,8 +5,8 @@ Tools for benchmarking and analyzing gene regulatory networks.
 ## Benchmarking
 
 ```{eval-rst}
-.. module:: pygreta.tl
-.. currentmodule:: pygreta.tl
+.. module:: gretapy.tl
+.. currentmodule:: gretapy.tl
 
 .. autosummary::
     :toctree: generated

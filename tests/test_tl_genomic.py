@@ -1,10 +1,10 @@
-"""Tests for pygreta.tl._genomic module."""
+"""Tests for gretapy.tl._genomic module."""
 
 import numpy as np
 import pandas as pd
 import pyranges as pr
 
-from pygreta.tl._genomic import _cre, _cre_column, _grn_to_pr, _peaks_to_pr
+from gretapy.tl._genomic import _cre, _cre_column, _grn_to_pr, _peaks_to_pr
 
 
 class TestGrnToPr:

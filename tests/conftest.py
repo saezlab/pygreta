@@ -1,19 +1,23 @@
 import anndata as ad
-import mudata as mu
 import numpy as np
 import pandas as pd
 import pyranges as pr
 import pytest
 
+import gretapy as gp
+
 
 def get_tf_names():
-    """Return common TF names used across fixtures."""
-    return ["PAX5", "GATA3", "SPI1", "RUNX1", "TCF7"]
+    """Return common TF names used across fixtures (matches toy() defaults)."""
+    return ["PAX5", "GATA3", "SPI1"]
 
 
 def get_target_genes():
-    """Return common target gene names used across fixtures."""
-    return ["CD19", "MS4A1", "CD3E", "IL7R", "CD14", "CD79A", "CD34", "BCL2", "IRF4", "FOXP3", "TCF7", "RUNX1"]
+    """Return common target gene names used across fixtures (matches toy() defaults)."""
+    # PAX5 targets: CD19, MS4A1, CD79A, BCL2, IRF4
+    # GATA3 targets: CD3E, IL7R, TCF7, FOXP3, RUNX1
+    # SPI1 targets: CD14, CD19, MS4A1, IRF4, RUNX1 (overlaps with PAX5/GATA3)
+    return ["CD19", "MS4A1", "CD79A", "BCL2", "IRF4", "CD3E", "IL7R", "TCF7", "FOXP3", "RUNX1", "CD14"]
 
 
 def get_all_genes():
@@ -21,161 +25,30 @@ def get_all_genes():
     return list(dict.fromkeys(get_tf_names() + get_target_genes()))
 
 
-def get_peak_names():
-    """Return common peak coordinates (near immune gene loci)."""
-    return [
-        "chr16-28931000-28931500",  # CD19 promoter
-        "chr16-28932000-28932500",  # CD19 enhancer
-        "chr11-60223000-60223500",  # MS4A1 enhancer
-        "chr11-60224000-60224500",  # MS4A1 enhancer 2
-        "chr11-118209000-118209500",  # CD3E promoter
-        "chr5-35871000-35871500",  # IL7R enhancer
-        "chr5-140013000-140013500",  # CD14 promoter
-        "chr19-41879000-41879500",  # CD79A promoter
-        "chr18-63318000-63318500",  # BCL2 enhancer
-        "chr6-411000-411500",  # IRF4 promoter
-        "chr6-412000-412500",  # IRF4 enhancer
-        "chr1-207940000-207940500",  # CD34 enhancer
-        "chr5-134110000-134110500",  # TCF7 promoter
-        "chrX-49250000-49250500",  # FOXP3 enhancer
-        "chr21-34799000-34799500",  # RUNX1 promoter
-        "chr21-34800000-34800500",  # RUNX1 enhancer
-    ]
+@pytest.fixture
+def toy_data():
+    """Base toy data fixture using gretapy.ds.toy()."""
+    return gp.ds.toy(seed=42)
 
 
 @pytest.fixture
-def adata():
-    """Basic AnnData object with gene universe matching simple_grn plus extra genes.
-
-    Expression is biologically structured: B cells have higher PAX5, T cells have higher GATA3.
-    Includes celltype annotation.
-    """
-    np.random.seed(42)
-    # Gene universe: all genes from simple_grn plus a few extra not in GRN
-    genes = get_all_genes() + ["ACTB", "GAPDH", "B2M"]  # housekeeping genes not in GRN
-    n_cells = 60  # divisible by 3 for equal cell type distribution
-    n_genes = len(genes)
-
-    # Create expression data with biological structure
-    X = np.random.rand(n_cells, n_genes).astype(np.float32)
-
-    # Cell type assignments (equal thirds)
-    celltypes = ["B cell"] * (n_cells // 3) + ["T cell"] * (n_cells // 3) + ["Monocyte"] * (n_cells // 3)
-
-    # Add cell type-specific TF expression patterns
-    pax5_idx = genes.index("PAX5")
-    gata3_idx = genes.index("GATA3")
-    spi1_idx = genes.index("SPI1")
-    # B cells: higher PAX5
-    X[: n_cells // 3, pax5_idx] += 2.0
-    # T cells: higher GATA3
-    X[n_cells // 3 : 2 * n_cells // 3, gata3_idx] += 2.0
-    # Monocytes: higher SPI1
-    X[2 * n_cells // 3 :, spi1_idx] += 1.5
-
-    adata = ad.AnnData(X=X)
-    adata.var_names = genes
-    adata.obs_names = [f"Cell{i}" for i in range(n_cells)]
-    adata.obs["celltype"] = celltypes
-    adata.layers["scaled"] = (X - X.mean(axis=0)) / (X.std(axis=0) + 1e-6)
-    return adata
+def mudata_with_celltype(toy_data):
+    """MuData object with RNA and ATAC modalities from toy data."""
+    mdata, _ = toy_data
+    return mdata
 
 
 @pytest.fixture
-def simple_grn():
-    """Realistic GRN DataFrame with TF-target-CRE relationships.
+def simple_grn(toy_data):
+    """GRN DataFrame from toy data."""
+    _, grn = toy_data
+    return grn
 
-    Contains 3 TFs (PAX5, GATA3, SPI1) each regulating 5+ target genes
-    through biologically plausible CREs near target gene loci.
-    """
-    return pd.DataFrame(
-        {
-            "source": [
-                # PAX5 targets (B cell lineage TF)
-                "PAX5",
-                "PAX5",
-                "PAX5",
-                "PAX5",
-                "PAX5",
-                "PAX5",
-                # GATA3 targets (T cell lineage TF)
-                "GATA3",
-                "GATA3",
-                "GATA3",
-                "GATA3",
-                "GATA3",
-                # SPI1/PU.1 targets (myeloid/B cell TF)
-                "SPI1",
-                "SPI1",
-                "SPI1",
-                "SPI1",
-                "SPI1",
-            ],
-            "target": [
-                # PAX5 regulates B cell genes
-                "CD19",
-                "MS4A1",
-                "CD79A",
-                "BCL2",
-                "IRF4",
-                "CD34",
-                # GATA3 regulates T cell genes
-                "CD3E",
-                "IL7R",
-                "TCF7",
-                "FOXP3",
-                "RUNX1",
-                # SPI1 regulates myeloid and B cell genes
-                "CD14",
-                "CD19",
-                "MS4A1",
-                "IRF4",
-                "RUNX1",
-            ],
-            "cre": [
-                # CREs near PAX5 target genes
-                "chr16-28931000-28931500",  # CD19 promoter region
-                "chr11-60223000-60223500",  # MS4A1 enhancer
-                "chr19-41879000-41879500",  # CD79A promoter
-                "chr18-63318000-63318500",  # BCL2 enhancer
-                "chr6-411000-411500",  # IRF4 promoter
-                "chr1-207940000-207940500",  # CD34 enhancer
-                # CREs near GATA3 target genes
-                "chr11-118209000-118209500",  # CD3E promoter
-                "chr5-35871000-35871500",  # IL7R enhancer
-                "chr5-134110000-134110500",  # TCF7 promoter
-                "chrX-49250000-49250500",  # FOXP3 enhancer
-                "chr21-34799000-34799500",  # RUNX1 promoter
-                # CREs near SPI1 target genes
-                "chr5-140013000-140013500",  # CD14 promoter
-                "chr16-28932000-28932500",  # CD19 enhancer (different from PAX5)
-                "chr11-60224000-60224500",  # MS4A1 enhancer (different from PAX5)
-                "chr6-412000-412500",  # IRF4 enhancer (different from PAX5)
-                "chr21-34800000-34800500",  # RUNX1 enhancer (different from GATA3)
-            ],
-            "score": [
-                # PAX5 activation scores
-                0.85,
-                0.72,
-                0.91,
-                0.68,
-                0.55,
-                0.43,
-                # GATA3 activation scores
-                0.88,
-                0.79,
-                0.65,
-                0.71,
-                0.52,
-                # SPI1 activation scores
-                0.92,
-                0.61,
-                0.58,
-                0.49,
-                0.67,
-            ],
-        }
-    )
+
+@pytest.fixture
+def adata(mudata_with_celltype):
+    """Basic AnnData object extracted from MuData RNA modality."""
+    return mudata_with_celltype.mod["rna"].copy()
 
 
 @pytest.fixture
@@ -183,8 +56,8 @@ def reference_grn_db():
     """Reference GRN database DataFrame with shared gene names."""
     return pd.DataFrame(
         {
-            "source": ["PAX5", "PAX5", "GATA3", "SPI1", "RUNX1"],
-            "target": ["CD19", "MS4A1", "IL7R", "CD14", "CD34"],
+            "source": ["PAX5", "PAX5", "GATA3", "SPI1", "SPI1"],
+            "target": ["CD19", "MS4A1", "IL7R", "CD14", "RUNX1"],
         }
     )
 
@@ -353,39 +226,17 @@ def gene_set_db():
                 "FOXP3",
                 "RUNX1",
                 "LEF1",
-                # Myeloid genes (CD14, SPI1, IRF4, CD34, RUNX1 present; CSF1R absent)
+                # Myeloid genes (CD14, SPI1, IRF4, MS4A1, RUNX1 present; CSF1R absent)
                 "CD14",
                 "SPI1",
                 "IRF4",
-                "CD34",
+                "MS4A1",
                 "RUNX1",
                 "CSF1R",
             ],
             "weight": [1.0] * 20,
         }
     )
-
-
-@pytest.fixture
-def mudata_with_celltype(adata):
-    """MuData object with RNA and ATAC modalities, RNA inherited from adata."""
-    np.random.seed(42)
-    peak_names = get_peak_names()
-
-    # RNA modality: use adata directly
-    rna = adata.copy()
-
-    # ATAC modality with peak_names (same cells as RNA)
-    n_cells = rna.n_obs
-    atac = ad.AnnData(X=np.random.rand(n_cells, len(peak_names)).astype(np.float32))
-    atac.var_names = peak_names
-    atac.obs_names = rna.obs_names.copy()
-    atac.obs["celltype"] = rna.obs["celltype"].values.copy()
-
-    mdata = mu.MuData({"rna": rna, "atac": atac})
-    mdata.obs["celltype"] = rna.obs["celltype"].values.copy()
-
-    return mdata
 
 
 @pytest.fixture

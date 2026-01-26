@@ -10,4 +10,5 @@ Plotting functions for visualizing GRN analysis results.
     :toctree: generated
 
     heatmap
+    links
 ```

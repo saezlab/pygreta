@@ -7,6 +7,7 @@ URL_END = "?download=1"
 
 DATA = {
     "hg38": {
+        "gann": "hg38_gann.bed.gz",
         "terms": "hg38_terms.csv.gz",
         "dbs": {
             # Prior knowledge

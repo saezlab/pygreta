@@ -4,6 +4,7 @@ import os
 import shutil
 
 import pandas as pd
+import pyranges as pr
 from decoupler._download import _download
 
 from gretapy.config import DATA, METRIC_CATS, PATH_DATA, URL_END, URL_STR
@@ -97,6 +98,41 @@ def show_terms(organism: str) -> pd.DataFrame:
             shutil.copyfileobj(data, f)
     terms_df = pd.read_csv(path_terms)
     return terms_df
+
+
+def show_genome_annotation(organism: str) -> pr.PyRanges:
+    """
+    Show genome annotation for an organism.
+
+    Parameters
+    ----------
+    organism
+        Which organism to use (e.g., "hg38", "mm10").
+
+    Returns
+    -------
+    PyRanges object with genome annotation.
+
+    Example
+    -------
+    .. code-block:: python
+
+        import gretapy as gt
+
+        gt.show_genome_annotation(organism="hg38")
+    """
+    organisms = show_organisms()
+    assert organism in organisms, f"organism={organism} not available ({organisms})"
+    fname_gann = DATA[organism]["gann"]
+    path_gann = os.path.join(PATH_DATA, fname_gann)
+    if not os.path.isfile(path_gann):
+        url = URL_STR + fname_gann + URL_END
+        data = _download(url, verbose=False)
+        data.seek(0)
+        with open(path_gann, "wb") as f:
+            shutil.copyfileobj(data, f)
+    gann_pr = pr.read_bed(path_gann)
+    return gann_pr
 
 
 def show_metrics(organism: str | None = None) -> pd.DataFrame:

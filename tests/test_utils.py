@@ -55,6 +55,22 @@ class TestShowTerms:
             gt.show_terms(organism="invalid_organism")
 
 
+class TestShowGenomeAnnotation:
+    """Tests for show_genome_annotation function."""
+
+    def test_returns_pyranges(self):
+        """Test that show_genome_annotation returns a PyRanges object."""
+        import pyranges as pr
+
+        result = gt.show_genome_annotation(organism="hg38")
+        assert isinstance(result, pr.PyRanges)
+
+    def test_invalid_organism_raises(self):
+        """Test that invalid organism raises assertion error."""
+        with pytest.raises(AssertionError):
+            gt.show_genome_annotation(organism="invalid_organism")
+
+
 class TestShowMetrics:
     """Tests for show_metrics function."""
 

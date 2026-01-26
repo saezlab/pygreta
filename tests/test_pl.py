@@ -9,7 +9,17 @@ import pytest
 # Use non-interactive backend for testing
 matplotlib.use("Agg")
 
+import anndata as ad
+import mudata as mu
+import pyranges as pr
+
 from gretapy.pl._heatmap import _make_sim_mat, heatmap
+from gretapy.pl._links import (
+    _get_gannot_data,
+    _get_tss_window,
+    _norm_score,
+    links,
+)
 
 # ============================================================================
 # Fixtures specific to pl module tests
@@ -241,6 +251,397 @@ class TestHeatmap:
             vmax=0.9,
             width=3,
             height=3,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+
+# ============================================================================
+# Fixtures for links tests
+# ============================================================================
+
+
+@pytest.fixture
+def gannot_pyranges():
+    """Gene annotations as PyRanges for links tests."""
+    return pr.PyRanges(
+        pd.DataFrame(
+            {
+                "Chromosome": ["chr1", "chr1", "chr1"],
+                "Start": [1000000, 1200000, 1400000],
+                "End": [1050000, 1250000, 1450000],
+                "Name": ["GENE_A", "GENE_B", "GENE_C"],
+                "Score": [0, 0, 0],
+                "Strand": ["+", "-", "+"],
+            }
+        )
+    )
+
+
+@pytest.fixture
+def rna_pseudobulk():
+    """RNA pseudobulk AnnData with cell types as obs and genes as var."""
+    X = np.array([[1.0, 0.5, 0.2], [0.3, 1.2, 0.8], [0.1, 0.4, 1.5]])
+    adata = ad.AnnData(X=X.astype(np.float32))
+    adata.obs_names = ["CellType_A", "CellType_B", "CellType_C"]
+    adata.var_names = ["GENE_A", "GENE_B", "GENE_C"]
+    return adata
+
+
+@pytest.fixture
+def atac_pseudobulk():
+    """ATAC pseudobulk AnnData with cell types as obs and CREs as var."""
+    # CREs in chr1 region that overlap with gene annotations
+    cre_names = [
+        "chr1-950000-960000",
+        "chr1-1020000-1030000",
+        "chr1-1100000-1110000",
+        "chr1-1180000-1190000",
+        "chr1-1350000-1360000",
+    ]
+    X = np.array(
+        [
+            [0.8, 0.3, 0.5, 0.2, 0.7],
+            [0.2, 0.9, 0.4, 0.6, 0.3],
+            [0.4, 0.1, 0.8, 0.9, 0.5],
+        ]
+    )
+    adata = ad.AnnData(X=X.astype(np.float32))
+    adata.obs_names = ["CellType_A", "CellType_B", "CellType_C"]
+    adata.var_names = cre_names
+    return adata
+
+
+@pytest.fixture
+def grn_single():
+    """Single GRN DataFrame for links tests."""
+    return pd.DataFrame(
+        {
+            "source": ["TF1", "TF1", "TF2", "TF2", "TF1"],
+            "target": ["GENE_A", "GENE_A", "GENE_A", "GENE_A", "GENE_B"],
+            "cre": [
+                "chr1-950000-960000",
+                "chr1-1020000-1030000",
+                "chr1-1100000-1110000",
+                "chr1-950000-960000",
+                "chr1-1180000-1190000",
+            ],
+            "score": [0.9, 0.7, 0.5, 0.8, 0.6],
+        }
+    )
+
+
+@pytest.fixture
+def grn_dict(grn_single):
+    """Dictionary of GRNs for links tests."""
+    grn2 = grn_single.copy()
+    grn2["score"] = grn2["score"] * 0.8
+    return {"GRN_Method1": grn_single, "GRN_Method2": grn2}
+
+
+@pytest.fixture
+def mdata_pseudobulk(rna_pseudobulk, atac_pseudobulk):
+    """MuData object with rna and atac modalities for links tests."""
+    return mu.MuData({"rna": rna_pseudobulk, "atac": atac_pseudobulk})
+
+
+# ============================================================================
+# _norm_score helper function tests
+# ============================================================================
+
+
+class TestNormScore:
+    """Tests for _norm_score helper function."""
+
+    def test_normalizes_to_0_1(self):
+        """Test that values are normalized to 0-1 range."""
+        x = np.array([10.0, 20.0, 30.0, 40.0])
+        result = _norm_score(x)
+
+        assert result.min() == 0.0
+        assert result.max() == 1.0
+
+    def test_constant_array_unchanged(self):
+        """Test that constant arrays are returned unchanged."""
+        x = np.array([5.0, 5.0, 5.0])
+        result = _norm_score(x)
+
+        np.testing.assert_array_equal(result, x)
+
+    def test_negative_values(self):
+        """Test normalization with negative values."""
+        x = np.array([-10.0, 0.0, 10.0])
+        result = _norm_score(x)
+
+        assert result.min() == 0.0
+        assert result.max() == 1.0
+        assert result[1] == 0.5
+
+
+# ============================================================================
+# _get_tss_window helper function tests
+# ============================================================================
+
+
+class TestGetTssWindow:
+    """Tests for _get_tss_window helper function."""
+
+    def test_plus_strand_tss(self, gannot_pyranges):
+        """Test TSS window for plus strand gene."""
+        result = _get_tss_window(gannot_pyranges, "GENE_A", w_size=100000)
+
+        # GENE_A is + strand, TSS should be at Start (1000000)
+        assert result.df["Start"].values[0] == 1000000 - 100000
+        assert result.df["End"].values[0] == 1000000 + 100000
+
+    def test_minus_strand_tss(self, gannot_pyranges):
+        """Test TSS window for minus strand gene."""
+        result = _get_tss_window(gannot_pyranges, "GENE_B", w_size=100000)
+
+        # GENE_B is - strand, TSS should be at End (1250000)
+        assert result.df["Start"].values[0] == 1250000 - 100000
+        assert result.df["End"].values[0] == 1250000 + 100000
+
+    def test_window_size(self, gannot_pyranges):
+        """Test that window size is correctly applied."""
+        result = _get_tss_window(gannot_pyranges, "GENE_A", w_size=50000)
+        window_size = result.df["End"].values[0] - result.df["Start"].values[0]
+
+        assert window_size == 100000  # 2 * w_size
+
+
+# ============================================================================
+# _get_gannot_data helper function tests
+# ============================================================================
+
+
+class TestGetGannotData:
+    """Tests for _get_gannot_data helper function."""
+
+    def test_returns_correct_tuple_length(self, gannot_pyranges, atac_pseudobulk):
+        """Test that function returns tuple with 7 elements."""
+        result = _get_gannot_data(gannot_pyranges, "GENE_A", 500000, atac_pseudobulk.var_names)
+
+        assert len(result) == 7
+
+    def test_extracts_chromosome(self, gannot_pyranges, atac_pseudobulk):
+        """Test that chromosome is correctly extracted."""
+        x_min, x_max, gs_gr, tss, chromosome, strand, cres_gr = _get_gannot_data(
+            gannot_pyranges, "GENE_A", 500000, atac_pseudobulk.var_names
+        )
+
+        assert chromosome == "chr1"
+
+    def test_extracts_strand(self, gannot_pyranges, atac_pseudobulk):
+        """Test that strand is correctly extracted."""
+        _, _, _, _, _, strand, _ = _get_gannot_data(gannot_pyranges, "GENE_A", 500000, atac_pseudobulk.var_names)
+
+        assert strand == "+"
+
+    def test_extracts_tss_plus_strand(self, gannot_pyranges, atac_pseudobulk):
+        """Test TSS extraction for plus strand."""
+        _, _, _, tss, _, strand, _ = _get_gannot_data(gannot_pyranges, "GENE_A", 500000, atac_pseudobulk.var_names)
+
+        assert strand == "+"
+        assert tss == 1000000
+
+    def test_extracts_tss_minus_strand(self, gannot_pyranges, atac_pseudobulk):
+        """Test TSS extraction for minus strand."""
+        _, _, _, tss, _, strand, _ = _get_gannot_data(gannot_pyranges, "GENE_B", 500000, atac_pseudobulk.var_names)
+
+        assert strand == "-"
+        assert tss == 1250000
+
+    def test_cres_are_pyranges(self, gannot_pyranges, atac_pseudobulk):
+        """Test that CREs are returned as PyRanges."""
+        _, _, _, _, _, _, cres_gr = _get_gannot_data(gannot_pyranges, "GENE_A", 500000, atac_pseudobulk.var_names)
+
+        assert isinstance(cres_gr, pr.PyRanges)
+
+
+# ============================================================================
+# links function tests
+# ============================================================================
+
+
+class TestLinks:
+    """Tests for links function."""
+
+    def test_returns_figure_when_return_fig_true(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test that return_fig=True returns a Figure."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_returns_none_when_return_fig_false(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test that return_fig=False returns None."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            return_fig=False,
+        )
+
+        assert result is None
+        plt.close("all")
+
+    def test_single_grn_dataframe(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test with single GRN as DataFrame."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1", "TF2"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_multiple_grns_dict(self, mdata_pseudobulk, grn_dict, gannot_pyranges):
+        """Test with multiple GRNs as dict."""
+        result = links(
+            mdata_pseudobulk,
+            grn_dict,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_multiple_tfs(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test plotting multiple TFs."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1", "TF2"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        # Should have 4 subplots: 2 TFs + 1 omics + 1 gannot
+        assert len(result.axes) == 4
+        plt.close(result)
+
+    def test_custom_palette(self, mdata_pseudobulk, grn_dict, gannot_pyranges):
+        """Test with custom color palette."""
+        palette = {"GRN_Method1": "red", "GRN_Method2": "blue"}
+        result = links(
+            mdata_pseudobulk,
+            grn_dict,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            palette=palette,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_custom_expr_cmap_list(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test with custom expression colormap as list."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            expr_cmap=["white", "red"],
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_custom_expr_cmap_string(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test with custom expression colormap as string."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            expr_cmap="viridis",
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_custom_figsize(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test with custom figure size."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            figsize=(5, 6),
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        plt.close(result)
+
+    def test_custom_dpi(self, mdata_pseudobulk, grn_single, gannot_pyranges):
+        """Test with custom DPI."""
+        result = links(
+            mdata_pseudobulk,
+            grn_single,
+            target="GENE_A",
+            tfs=["TF1"],
+            gannot=gannot_pyranges,
+            w_size=500000,
+            dpi=100,
+            return_fig=True,
+        )
+
+        assert isinstance(result, plt.Figure)
+        assert result.dpi == 100
+        plt.close(result)
+
+    def test_all_parameters_combined(self, mdata_pseudobulk, grn_dict, gannot_pyranges):
+        """Test with all parameters specified."""
+        palette = {"GRN_Method1": "green", "GRN_Method2": "orange"}
+        result = links(
+            mdata_pseudobulk,
+            grn_dict,
+            target="GENE_A",
+            tfs=["TF1", "TF2"],
+            gannot=gannot_pyranges,
+            w_size=300000,
+            palette=palette,
+            expr_cmap="Blues",
+            figsize=(4, 5),
+            dpi=120,
             return_fig=True,
         )
 

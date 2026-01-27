@@ -4,194 +4,354 @@ import anndata as ad
 import mudata as mu
 import numpy as np
 import pandas as pd
-from decoupler._download import _log
 
-# Default TF-celltype associations for biologically structured expression
+# Hardcoded GRN with hg38-style coordinates
+# Some TF-target pairs have multiple CREs (e.g., PAX5->CD19, GATA3->CD3E, SPI1->CD14)
+_GRN = pd.DataFrame(
+    {
+        "source": [
+            # PAX5 targets (B cell) - CD19 has 2 CREs
+            "PAX5",
+            "PAX5",
+            "PAX5",
+            "PAX5",
+            "PAX5",
+            "PAX5",
+            # EBF1 targets (B cell) - CD19 has 2 CREs
+            "EBF1",
+            "EBF1",
+            "EBF1",
+            "EBF1",
+            "EBF1",
+            "EBF1",
+            # GATA3 targets (T cell) - CD3E has 2 CREs
+            "GATA3",
+            "GATA3",
+            "GATA3",
+            "GATA3",
+            "GATA3",
+            "GATA3",
+            # TCF7 targets (T cell) - CD3E has 2 CREs
+            "TCF7",
+            "TCF7",
+            "TCF7",
+            "TCF7",
+            "TCF7",
+            "TCF7",
+            # SPI1 targets (Monocyte) - CD14 has 2 CREs
+            "SPI1",
+            "SPI1",
+            "SPI1",
+            "SPI1",
+            "SPI1",
+            "SPI1",
+            # CEBPA targets (Monocyte) - CD14 has 2 CREs
+            "CEBPA",
+            "CEBPA",
+            "CEBPA",
+            "CEBPA",
+            "CEBPA",
+            "CEBPA",
+        ],
+        "target": [
+            # PAX5 targets (CD19 with 2 CREs)
+            "CD19",
+            "CD19",
+            "MS4A1",
+            "CD79A",
+            "BCL2",
+            "IRF4",
+            # EBF1 targets (CD19 with 2 CREs)
+            "CD19",
+            "CD19",
+            "MS4A1",
+            "CD79A",
+            "IRF4",
+            "VPREB1",
+            # GATA3 targets (CD3E with 2 CREs)
+            "CD3E",
+            "CD3E",
+            "IL7R",
+            "LEF1",
+            "RUNX1",
+            "IRF4",
+            # TCF7 targets (CD3E with 2 CREs)
+            "CD3E",
+            "CD3E",
+            "IL7R",
+            "LEF1",
+            "RUNX1",
+            "BCL11B",
+            # SPI1 targets (CD14 with 2 CREs)
+            "CD14",
+            "CD14",
+            "CD68",
+            "CSF1R",
+            "IRF4",
+            "RUNX1",
+            # CEBPA targets (CD14 with 2 CREs)
+            "CD14",
+            "CD14",
+            "CD68",
+            "CSF1R",
+            "RUNX1",
+            "LYZ",
+        ],
+        "cre": [
+            # PAX5 CREs (2 for CD19)
+            "chr16-28926950-28927450",
+            "chr16-28936000-28936500",
+            "chr11-60443809-60444309",
+            "chr19-41827233-41827733",
+            "chr18-63073346-63073846",
+            "chr6-366739-367239",
+            # EBF1 CREs (2 for CD19, some shared with PAX5)
+            "chr16-28926950-28927450",
+            "chr16-28936000-28936500",
+            "chr11-60443809-60444309",
+            "chr19-41832233-41832733",
+            "chr6-366739-367239",
+            "chr22-22497505-22498005",
+            # GATA3 CREs (2 for CD3E)
+            "chr11-118336316-118336816",
+            "chr11-118296000-118296500",
+            "chr5-35861274-35861774",
+            "chr4-108037038-108037538",
+            "chr21-34772801-34773301",
+            "chr6-421739-422239",
+            # TCF7 CREs (2 for CD3E, some shared with GATA3)
+            "chr11-118336316-118336816",
+            "chr11-118296000-118296500",
+            "chr5-35861274-35861774",
+            "chr4-108042038-108042538",
+            "chr21-34772801-34773301",
+            "chr14-99159874-99160374",
+            # SPI1 CREs (2 for CD14)
+            "chr5-140628728-140629228",
+            "chr5-140638000-140638500",
+            "chr17-7573628-7574128",
+            "chr5-150043291-150043791",
+            "chr6-431739-432239",
+            "chr21-34777801-34778301",
+            # CEBPA CREs (2 for CD14, some shared with SPI1)
+            "chr5-140628728-140629228",
+            "chr5-140638000-140638500",
+            "chr17-7573628-7574128",
+            "chr5-150048291-150048791",
+            "chr21-34777801-34778301",
+            "chr12-69338350-69338850",
+        ],
+        "score": [
+            0.85,
+            0.72,
+            0.78,
+            0.72,
+            0.68,
+            0.81,
+            0.82,
+            0.70,
+            0.75,
+            0.69,
+            0.79,
+            0.71,
+            0.88,
+            0.74,
+            0.76,
+            0.73,
+            0.67,
+            0.74,
+            0.86,
+            0.71,
+            0.74,
+            0.70,
+            0.65,
+            0.77,
+            0.84,
+            0.73,
+            0.79,
+            0.71,
+            0.76,
+            0.69,
+            0.81,
+            0.69,
+            0.77,
+            0.68,
+            0.66,
+            0.73,
+        ],
+    }
+)
+
+# TF-celltype mapping for expression patterns
 _TF_CELLTYPE = {
     "PAX5": "B cell",
-    "EBF1": "B cell",  # Co-regulates B cell genes with PAX5
+    "EBF1": "B cell",
     "GATA3": "T cell",
-    "TCF7": "T cell",  # Co-regulates T cell genes with GATA3
+    "TCF7": "T cell",
     "SPI1": "Monocyte",
-    "CEBPA": "Monocyte",  # Co-regulates myeloid genes with SPI1
+    "CEBPA": "Monocyte",
 }
 
-# Default target genes per TF (immune-relevant, with overlap between TFs)
-# TFs that regulate the same celltype share target genes
-# Some "hub" genes (IRF4, RUNX1) are regulated by TFs across celltypes
+# Target genes per TF for expression patterns
 _TF_TARGETS = {
     "PAX5": ["CD19", "MS4A1", "CD79A", "BCL2", "IRF4"],
-    "EBF1": ["CD19", "MS4A1", "CD79A", "IRF4", "VPREB1"],  # Overlaps with PAX5, shares IRF4
-    "GATA3": ["CD3E", "IL7R", "TCF7", "RUNX1", "IRF4"],  # IRF4 is a hub gene
-    "TCF7": ["CD3E", "IL7R", "LEF1", "RUNX1", "BCL11B"],  # Overlaps with GATA3
-    "SPI1": ["CD14", "CD68", "CSF1R", "IRF4", "RUNX1"],  # IRF4, RUNX1 are hubs
-    "CEBPA": ["CD14", "CD68", "CSF1R", "RUNX1", "IRF4"],  # Overlaps with SPI1, shares hubs
+    "EBF1": ["CD19", "MS4A1", "CD79A", "IRF4", "VPREB1"],
+    "GATA3": ["CD3E", "IL7R", "LEF1", "RUNX1", "IRF4"],
+    "TCF7": ["CD3E", "IL7R", "LEF1", "RUNX1", "BCL11B"],
+    "SPI1": ["CD14", "CD68", "CSF1R", "IRF4", "RUNX1"],
+    "CEBPA": ["CD14", "CD68", "CSF1R", "RUNX1", "LYZ"],
 }
 
-# CREs that are shared between TFs of the same celltype (co-binding)
-# Format: {target_gene: {celltype: CRE_offset_from_TSS}}
-# TFs of the same celltype will share this CRE in addition to their unique ones
-_SHARED_CRES = {
-    "CD19": {"B cell": -5000},  # PAX5 and EBF1 co-bind near CD19 promoter
-    "MS4A1": {"B cell": -12000},  # Shared B cell enhancer
-    "CD3E": {"T cell": -8000},  # GATA3 and TCF7 co-bind
-    "IL7R": {"T cell": 15000},  # Shared T cell enhancer
-    "CD14": {"Monocyte": -3000},  # SPI1 and CEBPA co-bind at promoter
-    "CD68": {"Monocyte": -20000},  # Shared myeloid enhancer
-    "IRF4": {"B cell": -25000, "T cell": 30000, "Monocyte": -40000},  # Hub gene, multiple enhancers
-    "RUNX1": {"T cell": -15000, "Monocyte": 25000},  # Hub gene
+# All genes (TFs + unique targets)
+_TFS = ["PAX5", "EBF1", "GATA3", "TCF7", "SPI1", "CEBPA"]
+_TARGETS = [
+    "CD19",
+    "MS4A1",
+    "CD79A",
+    "BCL2",
+    "IRF4",
+    "VPREB1",
+    "CD3E",
+    "IL7R",
+    "LEF1",
+    "RUNX1",
+    "BCL11B",
+    "CD14",
+    "CD68",
+    "CSF1R",
+    "LYZ",
+]
+_GENES = _TFS + _TARGETS
+
+# Hardcoded peaks: GRN CREs + promoters for all genes
+_PEAKS = [
+    # GRN CREs (unique)
+    "chr16-28926950-28927450",
+    "chr16-28936000-28936500",
+    "chr11-60443809-60444309",
+    "chr19-41827233-41827733",
+    "chr18-63073346-63073846",
+    "chr6-366739-367239",
+    "chr19-41832233-41832733",
+    "chr22-22497505-22498005",
+    "chr11-118336316-118336816",
+    "chr11-118296000-118296500",
+    "chr5-35861274-35861774",
+    "chr4-108037038-108037538",
+    "chr21-34772801-34773301",
+    "chr6-421739-422239",
+    "chr4-108042038-108042538",
+    "chr14-99159874-99160374",
+    "chr5-140628728-140629228",
+    "chr5-140638000-140638500",
+    "chr17-7573628-7574128",
+    "chr5-150043291-150043791",
+    "chr6-431739-432239",
+    "chr21-34777801-34778301",
+    "chr5-150048291-150048791",
+    "chr12-69338350-69338850",
+    # Promoters for TFs (within 500bp upstream of TSS)
+    "chr9-37034268-37034768",  # PAX5 (TSS=37034268, -)
+    "chr5-159099916-159100416",  # EBF1 (TSS=159099916, -)
+    "chr10-8044878-8045378",  # GATA3 (TSS=8045378, +)
+    "chr5-134114181-134114681",  # TCF7 (TSS=134114681, +)
+    "chr11-47378547-47379047",  # SPI1 (TSS=47378547, -)
+    "chr19-33302534-33303034",  # CEBPA (TSS=33302534, -)
+    # Promoters for targets
+    "chr16-28931465-28931965",  # CD19 (TSS=28931965, +)
+    "chr11-60455346-60455846",  # MS4A1 (TSS=60455846, +)
+    "chr19-41876779-41877279",  # CD79A (TSS=41877279, +)
+    "chr18-63320128-63320628",  # BCL2 (TSS=63320128, -)
+    "chr6-391239-391739",  # IRF4 (TSS=391739, +)
+    "chr22-22244280-22244780",  # VPREB1 (TSS=22244780, +)
+    "chr11-118304230-118304730",  # CD3E (TSS=118304730, +)
+    "chr5-35852195-35852695",  # IL7R (TSS=35852695, +)
+    "chr4-108168956-108169456",  # LEF1 (TSS=108168956, -)
+    "chr21-36004667-36005167",  # RUNX1 (TSS=36004667, -)
+    "chr14-99272197-99272697",  # BCL11B (TSS=99272197, -)
+    "chr5-140633700-140634200",  # CD14 (TSS=140633700, -)
+    "chr17-7578991-7579491",  # CD68 (TSS=7579491, +)
+    "chr5-150113372-150113872",  # CSF1R (TSS=150113372, -)
+    "chr12-69347881-69348381",  # LYZ (TSS=69348381, +)
+]
+
+# Map CREs to celltypes for accessibility patterns
+_CRE_CELLTYPE = {
+    # B cell CREs
+    "chr16-28926950-28927450": "B cell",
+    "chr16-28936000-28936500": "B cell",
+    "chr11-60443809-60444309": "B cell",
+    "chr19-41827233-41827733": "B cell",
+    "chr18-63073346-63073846": "B cell",
+    "chr6-366739-367239": "B cell",
+    "chr19-41832233-41832733": "B cell",
+    "chr22-22497505-22498005": "B cell",
+    # T cell CREs
+    "chr11-118336316-118336816": "T cell",
+    "chr11-118296000-118296500": "T cell",
+    "chr5-35861274-35861774": "T cell",
+    "chr4-108037038-108037538": "T cell",
+    "chr21-34772801-34773301": "T cell",
+    "chr6-421739-422239": "T cell",
+    "chr4-108042038-108042538": "T cell",
+    "chr14-99159874-99160374": "T cell",
+    # Monocyte CREs
+    "chr5-140628728-140629228": "Monocyte",
+    "chr5-140638000-140638500": "Monocyte",
+    "chr17-7573628-7574128": "Monocyte",
+    "chr5-150043291-150043791": "Monocyte",
+    "chr6-431739-432239": "Monocyte",
+    "chr21-34777801-34778301": "Monocyte",
+    "chr5-150048291-150048791": "Monocyte",
+    "chr12-69338350-69338850": "Monocyte",
 }
 
-# TSS positions for genes (hg38 coordinates with strand)
-# Format: (chromosome, TSS position, strand)
-_GENE_TSS = {
-    # B cell genes
-    "CD19": ("chr16", 28931950, "+"),
-    "MS4A1": ("chr11", 60455809, "+"),
-    "CD79A": ("chr19", 41877233, "-"),
-    "BCL2": ("chr18", 63123346, "-"),
-    "IRF4": ("chr6", 391739, "+"),
-    "VPREB1": ("chr22", 22547505, "+"),
-    "IGLL1": ("chr22", 22355167, "-"),
-    # T cell genes
-    "CD3E": ("chr11", 118344316, "+"),
-    "IL7R": ("chr5", 35876274, "+"),
-    "TCF7": ("chr5", 134117803, "+"),
-    "FOXP3": ("chrX", 49250436, "-"),
-    "RUNX1": ("chr21", 34787801, "-"),
-    "LEF1": ("chr4", 108047038, "+"),
-    "BCL11B": ("chr14", 99169874, "-"),
-    # Myeloid genes
-    "CD14": ("chr5", 140631728, "-"),
-    "CD68": ("chr17", 7593628, "+"),
-    "CSF1R": ("chr5", 150053291, "+"),
-    "MPO": ("chr17", 58269861, "+"),
-    "LYZ": ("chr12", 69348350, "+"),
-    # TFs
-    "PAX5": ("chr9", 36833275, "-"),
-    "EBF1": ("chr5", 158523083, "-"),
-    "GATA3": ("chr10", 8045378, "-"),
-    "SPI1": ("chr11", 47380115, "+"),
-    "CEBPA": ("chr19", 33299934, "-"),
-    "CD34": ("chr1", 207928564, "+"),
+# Map gene promoters to celltypes
+_PROMOTER_CELLTYPE = {
+    # B cell TFs
+    "chr9-37034268-37034768": "B cell",  # PAX5
+    "chr5-159099916-159100416": "B cell",  # EBF1
+    # B cell targets
+    "chr16-28931465-28931965": "B cell",  # CD19
+    "chr11-60455346-60455846": "B cell",  # MS4A1
+    "chr19-41876779-41877279": "B cell",  # CD79A
+    "chr18-63320128-63320628": "B cell",  # BCL2
+    "chr22-22244280-22244780": "B cell",  # VPREB1
+    # T cell TFs
+    "chr10-8044878-8045378": "T cell",  # GATA3
+    "chr5-134114181-134114681": "T cell",  # TCF7
+    # T cell targets
+    "chr11-118304230-118304730": "T cell",  # CD3E
+    "chr5-35852195-35852695": "T cell",  # IL7R
+    "chr4-108168956-108169456": "T cell",  # LEF1
+    "chr14-99272197-99272697": "T cell",  # BCL11B
+    # Monocyte TFs
+    "chr11-47378547-47379047": "Monocyte",  # SPI1
+    "chr19-33302534-33303034": "Monocyte",  # CEBPA
+    # Monocyte targets
+    "chr5-140633700-140634200": "Monocyte",  # CD14
+    "chr17-7578991-7579491": "Monocyte",  # CD68
+    "chr5-150113372-150113872": "Monocyte",  # CSF1R
+    "chr12-69347881-69348381": "Monocyte",  # LYZ
+    # Hub genes (accessible in multiple celltypes)
+    "chr6-391239-391739": None,  # IRF4
+    "chr21-36004667-36005167": None,  # RUNX1
 }
 
 
-def _check_overlap(chrom: str, start: int, end: int, cre_intervals: dict, min_gap: int = 2) -> bool:
-    """Check if a CRE overlaps with any existing CREs on the same chromosome."""
-    if chrom not in cre_intervals:
-        return False
-    for existing_start, existing_end in cre_intervals[chrom]:
-        # Check if intervals overlap or are too close (less than min_gap apart)
-        if not (end + min_gap <= existing_start or start >= existing_end + min_gap):
-            return True
-    return False
-
-
-def _find_non_overlapping_position(
-    chrom: str,
-    preferred_start: int,
-    cre_length: int,
-    cre_intervals: dict,
-    min_gap: int = 2,
-    search_range: int = 10000,
-) -> int:
-    """Find a non-overlapping position for a CRE, searching near the preferred position."""
-    # Try the preferred position first
-    if not _check_overlap(chrom, preferred_start, preferred_start + cre_length, cre_intervals, min_gap):
-        return preferred_start
-
-    # Search alternating upstream and downstream
-    for offset in range(1, search_range):
-        # Try downstream
-        candidate = preferred_start + offset
-        if candidate > 0 and not _check_overlap(chrom, candidate, candidate + cre_length, cre_intervals, min_gap):
-            return candidate
-        # Try upstream
-        candidate = preferred_start - offset
-        if candidate > 0 and not _check_overlap(chrom, candidate, candidate + cre_length, cre_intervals, min_gap):
-            return candidate
-
-    # Fallback: return a position far from existing CREs
-    return preferred_start + search_range
-
-
-def _add_cre(
-    chrom: str,
-    start: int,
-    cre_length: int,
-    cre_intervals: dict,
-    peak_set: set,
-    peak_names: list,
-    min_gap: int = 2,
-) -> str:
-    """Add a CRE ensuring no overlap with existing CREs. Returns the CRE name."""
-    # Find non-overlapping position
-    start = _find_non_overlapping_position(chrom, start, cre_length, cre_intervals, min_gap)
-    end = start + cre_length
-
-    cre = f"{chrom}-{start}-{end}"
-
-    # Track the interval
-    if chrom not in cre_intervals:
-        cre_intervals[chrom] = []
-    cre_intervals[chrom].append((start, end))
-
-    # Add to peak tracking if not already present
-    if cre not in peak_set:
-        peak_set.add(cre)
-        peak_names.append(cre)
-
-    return cre
-
-
-def toy(
-    n_cells: int = 60,
-    n_tfs: int = 3,
-    n_targets_per_tf: int = 5,
-    n_peaks_per_target: int = 1,
-    celltypes: list[str] | None = None,
-    seed: int = 42,
-    verbose: bool = False,
-    max_expr: float = 12.0,
-) -> tuple[mu.MuData, pd.DataFrame]:
+def toy(n_cells: int = 60, seed: int = 42) -> tuple[mu.MuData, pd.DataFrame]:
     """
     Generate synthetic MuData and GRN for testing and demonstration.
 
     Creates biologically structured test data with RNA and ATAC modalities,
-    along with a gene regulatory network (GRN) DataFrame. CREs are placed
-    within +/- 100kb of target gene TSS for biological realism. Some genes
-    (e.g., IRF4, RUNX1) act as "hub" genes regulated by 4+ TFs across celltypes.
-
-    Additionally, promoter CREs (500bp) are generated for each gene based on
-    TSS positions from the hg38 genome annotation. These are placed within
-    +1000 upstream to -500 downstream of the TSS and included in the ATAC data.
+    along with a gene regulatory network (GRN) DataFrame.
 
     Parameters
     ----------
     n_cells : int
-        Number of cells to generate. Should be divisible by number of celltypes
-        for equal distribution. Default is 60.
-    n_tfs : int
-        Number of transcription factors. Must be between 1 and 6. TFs are paired
-        by celltype (PAX5/EBF1 for B cells, GATA3/TCF7 for T cells, SPI1/CEBPA
-        for monocytes). TFs of the same celltype can co-bind to shared CREs,
-        while also having their own unique CREs. Default is 3.
-    n_targets_per_tf : int
-        Number of target genes per TF. Must be between 1 and 5. Default is 5.
-    n_peaks_per_target : int
-        Number of CREs (peaks) per target gene. Each CRE is placed within
-        +/- 100kb of the gene's TSS. Default is 1.
-    celltypes : list[str] | None
-        Custom celltype names. If None, uses default celltypes based on n_tfs:
-        ["B cell", "T cell", "Monocyte"]. Default is None.
+        Number of cells to generate. Default is 60.
     seed : int
         Random seed for reproducibility. Default is 42.
-    verbose : bool
-        Whether to log progress messages. Default is False.
-    max_expr : float
-        Maximum value for expression/accessibility values. Values are scaled
-        to resemble log-normalized counts (0 to max_expr). Default is 12.0.
 
     Returns
     -------
@@ -202,152 +362,8 @@ def toy(
     """
     np.random.seed(seed)
 
-    # Validate parameters
-    if n_tfs < 1 or n_tfs > 6:
-        raise ValueError("n_tfs must be between 1 and 6")
-    if n_targets_per_tf < 1 or n_targets_per_tf > 5:
-        raise ValueError("n_targets_per_tf must be between 1 and 5")
-    if n_peaks_per_target < 1:
-        raise ValueError("n_peaks_per_target must be at least 1")
-
-    # Select TFs and their properties
-    tf_names = list(_TF_CELLTYPE.keys())[:n_tfs]
-    tf_celltypes = [_TF_CELLTYPE[tf] for tf in tf_names]
-
-    # Set up celltypes (use unique celltypes from selected TFs)
-    if celltypes is None:
-        # Preserve order while getting unique celltypes
-        seen_ct = set()
-        celltypes = []
-        for ct in tf_celltypes:
-            if ct not in seen_ct:
-                celltypes.append(ct)
-                seen_ct.add(ct)
+    celltypes = ["B cell", "T cell", "Monocyte"]
     n_celltypes = len(celltypes)
-
-    if n_cells % n_celltypes != 0:
-        _log(
-            f"n_cells={n_cells} not divisible by {n_celltypes} celltypes, distribution will be uneven",
-            level="warning",
-            verbose=verbose,
-        )
-
-    _log(f"Generating toy data with {n_cells} cells, {n_tfs} TFs", level="info", verbose=verbose)
-
-    # Build gene list: TFs + unique targets (preserve order)
-    target_genes = []
-    seen = set()
-    for tf in tf_names:
-        for target in _TF_TARGETS[tf][:n_targets_per_tf]:
-            if target not in seen:
-                target_genes.append(target)
-                seen.add(target)
-    all_genes = tf_names + target_genes
-
-    # Build GRN DataFrame with TSS-proximal CREs
-    # TFs get unique CREs, but TFs of the same celltype can share CREs (co-binding)
-    # All CREs are exactly 500bp and separated by at least 2bp
-    cre_length = 500
-    min_gap = 2
-    grn_records = []
-    peak_set = set()  # Track unique peaks
-    peak_names = []
-    cre_intervals = {}  # Track CRE intervals per chromosome for overlap checking
-    tf_target_peaks = {}  # Map (tf, target) -> list of peak names for ATAC patterns
-    cre_to_celltype = {}  # Track which celltype each CRE is accessible in
-
-    # First pass: generate shared CREs for co-binding TFs of the same celltype
-    shared_cre_map = {}  # Map (target, celltype) -> CRE name
-    for target, celltype_offsets in _SHARED_CRES.items():
-        if target not in _GENE_TSS:
-            continue
-        chrom, tss, _ = _GENE_TSS[target]
-        for celltype, offset in celltype_offsets.items():
-            preferred_start = max(1, tss + offset)
-            cre = _add_cre(chrom, preferred_start, cre_length, cre_intervals, peak_set, peak_names, min_gap)
-            shared_cre_map[(target, celltype)] = cre
-            cre_to_celltype[cre] = celltype
-
-    # Second pass: generate unique CREs per TF and add shared CREs where applicable
-    for tf_idx, tf in enumerate(tf_names):
-        tf_celltype = _TF_CELLTYPE[tf]
-        targets = _TF_TARGETS[tf][:n_targets_per_tf]
-
-        for target in targets:
-            # Get TSS info for this target
-            if target in _GENE_TSS:
-                chrom, tss, _ = _GENE_TSS[target]
-            else:
-                # Fallback for unknown genes
-                chrom, tss = "chr1", 10000000
-
-            tf_target_peaks[(tf, target)] = []
-
-            # Add shared CRE if this TF's celltype has one for this target
-            shared_key = (target, tf_celltype)
-            if shared_key in shared_cre_map:
-                shared_cre = shared_cre_map[shared_key]
-                tf_target_peaks[(tf, target)].append(shared_cre)
-                score = np.random.uniform(0.5, 0.95)  # Shared CREs tend to have good scores
-                grn_records.append(
-                    {
-                        "source": tf,
-                        "target": target,
-                        "cre": shared_cre,
-                        "score": round(score, 2),
-                    }
-                )
-
-            # Add unique CREs for this TF
-            for peak_idx in range(n_peaks_per_target):
-                # Place CRE within +/- 100kb of TSS
-                # Use tf_idx and peak_idx to ensure different TFs get different CREs
-                offset = np.random.randint(-100000, 100000)
-                # Add TF-specific shift to ensure different TFs get different CREs
-                offset += tf_idx * 5000 + peak_idx * 1000
-                preferred_start = max(1, tss + offset)
-
-                cre = _add_cre(chrom, preferred_start, cre_length, cre_intervals, peak_set, peak_names, min_gap)
-
-                # Track peaks for this TF-target pair
-                tf_target_peaks[(tf, target)].append(cre)
-                cre_to_celltype[cre] = tf_celltype
-
-                score = np.random.uniform(0.4, 0.95)
-                grn_records.append(
-                    {
-                        "source": tf,
-                        "target": target,
-                        "cre": cre,
-                        "score": round(score, 2),
-                    }
-                )
-
-    grn = pd.DataFrame(grn_records)
-
-    # Generate promoter CREs for each gene using embedded TSS data
-    # Promoter region: +1000 upstream to -500 downstream of TSS
-    # Place a 500bp CRE within this region, close to TSS
-    promoter_peaks = {}  # Map gene -> promoter CRE name
-    for gene in all_genes:
-        if gene not in _GENE_TSS:
-            continue
-        chrom, tss, strand = _GENE_TSS[gene]
-
-        # Place promoter CRE near TSS
-        # For + strand: upstream is lower coords, so CRE at [TSS-500, TSS]
-        # For - strand: upstream is higher coords, so CRE at [TSS, TSS+500]
-        if strand == "+":
-            # Random position within [-1000, -500] from TSS (upstream)
-            offset = np.random.randint(-1000, -500)
-            preferred_start = max(1, tss + offset)
-        else:
-            # Random position within [0, 500] from TSS (upstream for - strand)
-            offset = np.random.randint(0, 500)
-            preferred_start = max(1, tss + offset)
-
-        promoter_cre = _add_cre(chrom, preferred_start, cre_length, cre_intervals, peak_set, peak_names, min_gap)
-        promoter_peaks[gene] = promoter_cre
 
     # Create cell type assignments
     cells_per_type = n_cells // n_celltypes
@@ -357,95 +373,62 @@ def toy(
         count = cells_per_type + (1 if i < remainder else 0)
         celltype_list.extend([ct] * count)
 
-    # Create RNA expression matrix with biological structure
-    # Values resemble log-normalized counts (sparse, with most values low)
-    n_genes = len(all_genes)
-    # Use exponential distribution for sparse-like pattern, then scale
+    # Create RNA expression matrix
+    n_genes = len(_GENES)
     X_rna = np.random.exponential(scale=1.0, size=(n_cells, n_genes)).astype(np.float32)
-    X_rna = np.clip(X_rna, 0, max_expr * 0.4)  # Base expression is low
+    X_rna = np.clip(X_rna, 0, 4.0)
 
-    # Add TF-specific expression patterns
-    for i, tf in enumerate(tf_names):
-        tf_idx = all_genes.index(tf)
-        ct = tf_celltypes[i]
-        # Find cells of this celltype
+    # Add TF and target expression patterns per celltype
+    for tf, ct in _TF_CELLTYPE.items():
+        tf_idx = _GENES.index(tf)
         cell_mask = np.array([c == ct for c in celltype_list])
-        # Add higher expression for TF in its celltype
         X_rna[cell_mask, tf_idx] += np.random.uniform(3.0, 6.0, size=cell_mask.sum())
 
-        # Also upregulate target genes in the corresponding celltype
-        targets = _TF_TARGETS[tf][:n_targets_per_tf]
-        for target in targets:
-            if target in all_genes:
-                target_idx = all_genes.index(target)
-                X_rna[cell_mask, target_idx] += np.random.uniform(2.0, 5.0, size=cell_mask.sum())
+        for target in _TF_TARGETS[tf]:
+            target_idx = _GENES.index(target)
+            X_rna[cell_mask, target_idx] += np.random.uniform(2.0, 5.0, size=cell_mask.sum())
 
-    # Clip to max expression value
-    X_rna = np.clip(X_rna, 0, max_expr)
+    X_rna = np.clip(X_rna, 0, 12.0)
 
     # Create RNA AnnData
     rna = ad.AnnData(X=X_rna)
-    rna.var_names = all_genes
+    rna.var_names = _GENES
     rna.obs_names = [f"Cell{i}" for i in range(n_cells)]
 
-    # Create ATAC accessibility matrix with biological structure
-    n_peaks = len(peak_names)
-    # Use exponential distribution for sparse-like pattern
+    # Create ATAC accessibility matrix
+    n_peaks = len(_PEAKS)
     X_atac = np.random.exponential(scale=0.8, size=(n_cells, n_peaks)).astype(np.float32)
-    X_atac = np.clip(X_atac, 0, max_expr * 0.3)  # Base accessibility is low
+    X_atac = np.clip(X_atac, 0, 3.0)
 
-    # Add TF-specific accessibility patterns
-    # CREs associated with a TF should be more accessible in cells where that TF is active
-    peak_name_to_idx = {p: i for i, p in enumerate(peak_names)}
-    for i, tf in enumerate(tf_names):
-        ct = tf_celltypes[i]
-        cell_mask = np.array([c == ct for c in celltype_list])
-        targets = _TF_TARGETS[tf][:n_targets_per_tf]
+    peak_idx_map = {p: i for i, p in enumerate(_PEAKS)}
 
-        for target in targets:
-            # Get CREs associated with this TF-target pair
-            cre_list = tf_target_peaks.get((tf, target), [])
-            for cre in cre_list:
-                if cre in peak_name_to_idx:
-                    peak_idx = peak_name_to_idx[cre]
-                    # Increase accessibility in cells of the corresponding celltype
-                    X_atac[cell_mask, peak_idx] += np.random.uniform(2.0, 5.0, size=cell_mask.sum())
+    # Add accessibility patterns for CREs
+    for cre, ct in _CRE_CELLTYPE.items():
+        if cre in peak_idx_map:
+            peak_idx = peak_idx_map[cre]
+            cell_mask = np.array([c == ct for c in celltype_list])
+            X_atac[cell_mask, peak_idx] += np.random.uniform(2.0, 5.0, size=cell_mask.sum())
 
-    # Add promoter accessibility patterns
-    # Promoters should be accessible in cells where the gene is expressed
-    for i, tf in enumerate(tf_names):
-        ct = tf_celltypes[i]
-        cell_mask = np.array([c == ct for c in celltype_list])
-
-        # TF promoter accessible in its celltype
-        if tf in promoter_peaks and promoter_peaks[tf] in peak_name_to_idx:
-            peak_idx = peak_name_to_idx[promoter_peaks[tf]]
-            X_atac[cell_mask, peak_idx] += np.random.uniform(3.0, 6.0, size=cell_mask.sum())
-
-        # Target gene promoters accessible in the TF's celltype
-        targets = _TF_TARGETS[tf][:n_targets_per_tf]
-        for target in targets:
-            if target in promoter_peaks and promoter_peaks[target] in peak_name_to_idx:
-                peak_idx = peak_name_to_idx[promoter_peaks[target]]
+    # Add accessibility patterns for promoters
+    for promoter, ct in _PROMOTER_CELLTYPE.items():
+        if promoter in peak_idx_map:
+            peak_idx = peak_idx_map[promoter]
+            if ct is None:
+                # Hub gene promoters accessible in all celltypes
+                X_atac[:, peak_idx] += np.random.uniform(1.5, 3.0, size=n_cells)
+            else:
+                cell_mask = np.array([c == ct for c in celltype_list])
                 X_atac[cell_mask, peak_idx] += np.random.uniform(2.0, 5.0, size=cell_mask.sum())
 
-    # Clip to max value
-    X_atac = np.clip(X_atac, 0, max_expr)
+    X_atac = np.clip(X_atac, 0, 12.0)
 
     # Create ATAC AnnData
     atac = ad.AnnData(X=X_atac)
-    atac.var_names = peak_names
+    atac.var_names = _PEAKS
     atac.obs_names = rna.obs_names.copy()
 
     # Create MuData
     mdata = mu.MuData({"rna": rna, "atac": atac})
     mdata.obs["celltype"] = celltype_list
 
-    _log(
-        f"Created MuData with {n_cells} cells, {n_genes} genes, {n_peaks} peaks",
-        level="info",
-        verbose=verbose,
-    )
-    _log(f"Created GRN with {len(grn)} edges", level="info", verbose=verbose)
-
-    return mdata, grn
+    return mdata, _GRN.copy()

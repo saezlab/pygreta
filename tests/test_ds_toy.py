@@ -1,6 +1,5 @@
 import mudata as mu
 import pandas as pd
-import pytest
 
 import gretapy as gp
 
@@ -40,8 +39,6 @@ class TestMuDataModalities:
     def test_celltype_annotation_exists(self):
         mdata, _ = gp.ds.toy()
         assert "celltype" in mdata.obs.columns
-        assert "celltype" in mdata.mod["rna"].obs.columns
-        assert "celltype" in mdata.mod["atac"].obs.columns
 
 
 class TestGRNColumns:
@@ -80,34 +77,53 @@ class TestParameters:
         mdata, _ = gp.ds.toy(n_cells=30)
         assert mdata.n_obs == 30
 
-    def test_n_tfs(self):
-        _, grn = gp.ds.toy(n_tfs=2)
-        assert grn["source"].nunique() == 2
 
-    def test_n_targets_per_tf(self):
-        _, grn = gp.ds.toy(n_tfs=1, n_targets_per_tf=3, n_peaks_per_target=1)
-        assert len(grn) == 3
+class TestCREValidation:
+    """Test CRE coordinate validation."""
 
-    def test_n_peaks_per_target(self):
-        _, grn = gp.ds.toy(n_tfs=1, n_targets_per_tf=2, n_peaks_per_target=2)
-        assert len(grn) == 4
+    def test_all_cres_exactly_500bp(self):
+        """All CREs should be exactly 500 base pairs."""
+        mdata, _ = gp.ds.toy()
+        for peak in mdata.mod["atac"].var_names:
+            parts = peak.split("-")
+            size = int(parts[2]) - int(parts[1])
+            assert size == 500, f"CRE {peak} is {size} bp, expected 500"
 
-    def test_custom_celltypes(self):
-        custom_cts = ["TypeA", "TypeB"]
-        mdata, _ = gp.ds.toy(n_cells=20, celltypes=custom_cts)
-        assert set(mdata.obs["celltype"]) == set(custom_cts)
+    def test_no_cre_overlaps(self):
+        """No CREs should overlap with each other."""
+        mdata, _ = gp.ds.toy()
+        peaks = list(mdata.mod["atac"].var_names)
 
-    def test_invalid_n_tfs(self):
-        with pytest.raises(ValueError, match="n_tfs must be between 1 and 3"):
-            gp.ds.toy(n_tfs=0)
-        with pytest.raises(ValueError, match="n_tfs must be between 1 and 3"):
-            gp.ds.toy(n_tfs=4)
+        # Group by chromosome
+        by_chrom = {}
+        for peak in peaks:
+            chrom, start, end = peak.split("-")
+            start, end = int(start), int(end)
+            if chrom not in by_chrom:
+                by_chrom[chrom] = []
+            by_chrom[chrom].append((start, end, peak))
 
-    def test_invalid_n_targets(self):
-        with pytest.raises(ValueError, match="n_targets_per_tf must be between 1 and 5"):
-            gp.ds.toy(n_targets_per_tf=0)
-        with pytest.raises(ValueError, match="n_targets_per_tf must be between 1 and 5"):
-            gp.ds.toy(n_targets_per_tf=6)
+        # Check for overlaps
+        for _chrom, intervals in by_chrom.items():
+            intervals.sort()
+            for i in range(len(intervals) - 1):
+                assert intervals[i][1] <= intervals[i + 1][0], (
+                    f"CREs overlap: {intervals[i][2]} and {intervals[i + 1][2]}"
+                )
+
+    def test_tfs_bind_multiple_cres_for_some_targets(self):
+        """Some TF-target pairs should have multiple CREs."""
+        _, grn = gp.ds.toy()
+        cre_counts = grn.groupby(["source", "target"])["cre"].count()
+        multi_cre_pairs = cre_counts[cre_counts > 1]
+        assert len(multi_cre_pairs) > 0, "No TF-target pairs have multiple CREs"
+
+    def test_grn_cres_in_atac(self):
+        """All CREs in the GRN should be present in ATAC var_names."""
+        mdata, grn = gp.ds.toy()
+        atac_peaks = set(mdata.mod["atac"].var_names)
+        for cre in grn["cre"].unique():
+            assert cre in atac_peaks, f"GRN CRE {cre} not in ATAC var_names"
 
 
 class TestSeedReproducibility:

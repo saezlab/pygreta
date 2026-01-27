@@ -6,8 +6,6 @@ import numpy as np
 import pandas as pd
 from decoupler._download import _log
 
-from gretapy._utils import show_genome_annotation
-
 # Default TF-celltype associations for biologically structured expression
 _TF_CELLTYPE = {
     "PAX5": "B cell",
@@ -44,38 +42,38 @@ _SHARED_CRES = {
     "RUNX1": {"T cell": -15000, "Monocyte": 25000},  # Hub gene
 }
 
-# TSS positions for genes (hg38 approximate coordinates)
-# Format: (chromosome, TSS position)
+# TSS positions for genes (hg38 coordinates with strand)
+# Format: (chromosome, TSS position, strand)
 _GENE_TSS = {
     # B cell genes
-    "CD19": ("chr16", 28931950),
-    "MS4A1": ("chr11", 60455809),
-    "CD79A": ("chr19", 41877233),
-    "BCL2": ("chr18", 63123346),
-    "IRF4": ("chr6", 391739),
-    "VPREB1": ("chr22", 22547505),
-    "IGLL1": ("chr22", 22355167),
+    "CD19": ("chr16", 28931950, "+"),
+    "MS4A1": ("chr11", 60455809, "+"),
+    "CD79A": ("chr19", 41877233, "-"),
+    "BCL2": ("chr18", 63123346, "-"),
+    "IRF4": ("chr6", 391739, "+"),
+    "VPREB1": ("chr22", 22547505, "+"),
+    "IGLL1": ("chr22", 22355167, "-"),
     # T cell genes
-    "CD3E": ("chr11", 118344316),
-    "IL7R": ("chr5", 35876274),
-    "TCF7": ("chr5", 134117803),
-    "FOXP3": ("chrX", 49250436),
-    "RUNX1": ("chr21", 34787801),
-    "LEF1": ("chr4", 108047038),
-    "BCL11B": ("chr14", 99169874),
+    "CD3E": ("chr11", 118344316, "+"),
+    "IL7R": ("chr5", 35876274, "+"),
+    "TCF7": ("chr5", 134117803, "+"),
+    "FOXP3": ("chrX", 49250436, "-"),
+    "RUNX1": ("chr21", 34787801, "-"),
+    "LEF1": ("chr4", 108047038, "+"),
+    "BCL11B": ("chr14", 99169874, "-"),
     # Myeloid genes
-    "CD14": ("chr5", 140631728),
-    "CD68": ("chr17", 7593628),
-    "CSF1R": ("chr5", 150053291),
-    "MPO": ("chr17", 58269861),
-    "LYZ": ("chr12", 69348350),
-    # TFs (for reference)
-    "PAX5": ("chr9", 36833275),
-    "EBF1": ("chr5", 158523083),
-    "GATA3": ("chr10", 8045378),
-    "SPI1": ("chr11", 47380115),
-    "CEBPA": ("chr19", 33299934),
-    "CD34": ("chr1", 207928564),
+    "CD14": ("chr5", 140631728, "-"),
+    "CD68": ("chr17", 7593628, "+"),
+    "CSF1R": ("chr5", 150053291, "+"),
+    "MPO": ("chr17", 58269861, "+"),
+    "LYZ": ("chr12", 69348350, "+"),
+    # TFs
+    "PAX5": ("chr9", 36833275, "-"),
+    "EBF1": ("chr5", 158523083, "-"),
+    "GATA3": ("chr10", 8045378, "-"),
+    "SPI1": ("chr11", 47380115, "+"),
+    "CEBPA": ("chr19", 33299934, "-"),
+    "CD34": ("chr1", 207928564, "+"),
 }
 
 
@@ -263,7 +261,7 @@ def toy(
     for target, celltype_offsets in _SHARED_CRES.items():
         if target not in _GENE_TSS:
             continue
-        chrom, tss = _GENE_TSS[target]
+        chrom, tss, _ = _GENE_TSS[target]
         for celltype, offset in celltype_offsets.items():
             preferred_start = max(1, tss + offset)
             cre = _add_cre(chrom, preferred_start, cre_length, cre_intervals, peak_set, peak_names, min_gap)
@@ -278,7 +276,7 @@ def toy(
         for target in targets:
             # Get TSS info for this target
             if target in _GENE_TSS:
-                chrom, tss = _GENE_TSS[target]
+                chrom, tss, _ = _GENE_TSS[target]
             else:
                 # Fallback for unknown genes
                 chrom, tss = "chr1", 10000000
@@ -327,33 +325,14 @@ def toy(
 
     grn = pd.DataFrame(grn_records)
 
-    # Load genome annotation and generate promoter CREs for all genes
-    gann = show_genome_annotation("hg38")
-    gann_df = gann.df
-    gene_to_tss = {}
-    for gene in all_genes:
-        gene_rows = gann_df[gann_df["Name"] == gene]
-        if len(gene_rows) > 0:
-            row = gene_rows.iloc[0]
-            chrom = row["Chromosome"]
-            strand = row["Strand"]
-            # TSS is at Start for + strand, at End for - strand
-            tss = int(row["Start"]) if strand == "+" else int(row["End"])
-            gene_to_tss[gene] = (chrom, tss, strand)
-
-    # Generate promoter CREs for each gene
+    # Generate promoter CREs for each gene using embedded TSS data
     # Promoter region: +1000 upstream to -500 downstream of TSS
     # Place a 500bp CRE within this region, close to TSS
     promoter_peaks = {}  # Map gene -> promoter CRE name
     for gene in all_genes:
-        if gene in gene_to_tss:
-            chrom, tss, strand = gene_to_tss[gene]
-        elif gene in _GENE_TSS:
-            # Fallback to hardcoded TSS if not in annotation
-            chrom, tss = _GENE_TSS[gene]
-            strand = "+"
-        else:
+        if gene not in _GENE_TSS:
             continue
+        chrom, tss, strand = _GENE_TSS[gene]
 
         # Place promoter CRE near TSS
         # For + strand: upstream is lower coords, so CRE at [TSS-500, TSS]
